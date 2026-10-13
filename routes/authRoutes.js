@@ -3,6 +3,7 @@ const express = require("express");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -138,6 +139,32 @@ router.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Login error:", error.message);
+
+    return res.status(500).json({
+      message: "Internal server error"
+    });
+  }
+});
+// GET /api/auth/me
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+
+    if (!user) {
+      return res.status(404).json({
+        message: "User not found"
+      });
+    }
+
+    return res.status(200).json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (error) {
+    console.error("Get profile error:", error.message);
 
     return res.status(500).json({
       message: "Internal server error"
