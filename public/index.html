@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#121817">
+    <meta name="description" content="Choose a training time at Bolt Gym.">
+    <title>Bolt — Find your rhythm</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <main id="authView" class="auth-layout">
+      <section class="auth-story">
+        <a class="brand brand-light" href="/" aria-label="Bolt home"><span class="brand-mark">B</span><span>Bolt<span class="brand-period">.</span></span></a>
+        <div class="story-copy">
+          <p class="eyebrow eyebrow-light">MAKE SPACE FOR YOU</p>
+          <h1>Move with<br><em>intention.</em></h1>
+          <p class="story-description">A little time for yourself changes everything. Find an open training window, show up, and keep your own kind of strong.</p>
+          <div class="story-proof"><span class="proof-line"></span><span>Good energy, on your schedule.</span></div>
+        </div>
+        <div class="story-foot"><span>YOGA · CARDIO · STRENGTH</span><span>01 / EVERY DAY</span></div>
+        <div class="story-orb" aria-hidden="true"><span></span><i></i></div>
+      </section>
+
+      <section class="auth-side">
+        <div class="auth-mobile-brand"><a class="brand" href="/" aria-label="Bolt home"><span class="brand-mark">B</span><span>Bolt<span class="brand-period">.</span></span></a></div>
+        <div class="auth-card">
+          <p class="eyebrow">YOUR NEXT CHAPTER</p>
+          <h2 id="authHeading">Welcome back</h2>
+          <p id="authSubheading" class="muted">Sign in to find your next session.</p>
+          <div class="auth-tabs" role="tablist" aria-label="Account access">
+            <button class="auth-tab active" type="button" data-auth-tab="login" role="tab" aria-selected="true">Sign in</button>
+            <button class="auth-tab" type="button" data-auth-tab="register" role="tab" aria-selected="false">Create account</button>
+          </div>
+          <form id="loginForm" class="form-stack">
+            <label>Email address<input name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+            <label>Password<input name="password" type="password" autocomplete="current-password" placeholder="Your password" required></label>
+            <button class="button button-dark button-wide" type="submit">Sign in <span aria-hidden="true">→</span></button>
+          </form>
+          <form id="registerForm" class="form-stack hidden">
+            <label>Your name<input name="name" type="text" autocomplete="name" placeholder="How should we call you?" maxlength="80" required></label>
+            <label>Email address<input name="email" type="email" autocomplete="email" placeholder="you@example.com" required></label>
+            <label>Password<input name="password" type="password" autocomplete="new-password" placeholder="At least 8 characters" minlength="8" required></label>
+            <button class="button button-dark button-wide" type="submit">Create account <span aria-hidden="true">→</span></button>
+          </form>
+          <p class="auth-note"><span class="lock-icon" aria-hidden="true">◈</span> Your account stays yours. Sign in securely and book when you’re ready.</p>
+        </div>
+        <p class="auth-copyright">© <span id="year"></span> BOLT GYM <span>·</span> STRONGER IN YOUR OWN WAY</p>
+      </section>
+    </main>
+
+    <div id="appView" class="app-shell hidden">
+      <header class="topbar">
+        <a class="brand" href="#schedule" aria-label="Bolt home"><span class="brand-mark">B</span><span>Bolt<span class="brand-period">.</span></span></a>
+        <nav class="top-nav" aria-label="Main navigation">
+          <button class="nav-link active" type="button" data-view="schedule">Schedule</button>
+          <button class="nav-link" type="button" data-view="bookings">My bookings</button>
+          <button id="adminNav" class="nav-link hidden" type="button" data-view="admin">Admin</button>
+        </nav>
+        <div class="account-menu"><span id="userAvatar" class="avatar">F</span><span id="userName" class="account-name"></span><button id="logoutButton" class="text-button" type="button">Sign out</button></div>
+      </header>
+
+      <div id="memberView" class="app-content">
+        <section class="welcome-banner">
+          <div class="welcome-copy">
+            <p id="todayLabel" class="eyebrow eyebrow-light"></p>
+            <h1>Find your <em>flow.</em></h1>
+            <p>One good session can change the shape of your day.</p>
+          </div>
+          <div class="welcome-aside"><span class="welcome-index">YOUR PRACTICE</span><span class="welcome-mark" aria-hidden="true">F<span>.</span></span><span class="welcome-caption">A stronger day<br>starts with showing up.</span></div>
+          <div class="banner-ring" aria-hidden="true"></div>
+        </section>
+
+        <div class="dashboard-grid">
+          <section id="scheduleSection" class="panel schedule-panel">
+            <div class="section-heading">
+              <div><p class="eyebrow">CHOOSE YOUR WINDOW</p><h2>Equipment availability</h2></div>
+            </div>
+            <form id="bookingForm" class="booking-builder">
+              <div class="form-two">
+                <label>Date<input id="bookingDate" name="date" type="date" required></label>
+                <label>Training type<select id="bookingCategory" name="category"><option value="yoga">Yoga</option><option value="cardio">Cardio</option><option value="strength">Strength training</option></select></label>
+              </div>
+              <div class="form-two">
+                <label>Start time<select id="bookingStart" name="startTime" required></select></label>
+                <label>End time<select id="bookingEnd" name="endTime" required></select></label>
+              </div>
+              <p id="bookingWindowNote" class="muted">Choose a date and a 30-minute-aligned window.</p>
+              <button id="bookWindowButton" class="button button-dark" type="submit">Reserve this time <span aria-hidden="true">→</span></button>
+              <p id="bookingAccessNote" class="booking-access-note"></p>
+            </form>
+            <div class="availability-heading"><span id="availabilityDay">AVAILABLE 30-MINUTE WINDOWS</span><span id="availabilityHours"></span></div>
+            <div id="scheduleList" class="schedule-list"><div class="loading-state">Loading equipment availability…</div></div>
+          </section>
+
+          <aside class="side-column">
+            <section id="membershipCard" class="membership-card"></section>
+            <section class="panel bookings-panel">
+              <div class="section-heading compact-heading"><div><p class="eyebrow">ON YOUR CALENDAR</p><h2>My bookings</h2></div><button class="icon-link" type="button" data-view="bookings" aria-label="See all bookings">→</button></div>
+              <div id="upcomingBookings" class="mini-bookings"><div class="loading-state">Loading bookings…</div></div>
+            </section>
+            <div class="quote-card"><span class="quote-mark">“</span><p>Progress is built one promise to yourself at a time.</p><span class="quote-credit">A NOTE TO YOURSELF</span></div>
+          </aside>
+        </div>
+
+        <section id="allBookingsSection" class="panel full-bookings hidden">
+          <div class="section-heading"><div><p class="eyebrow">YOUR COMMITMENTS</p><h2>All bookings</h2></div><button class="button button-outline" type="button" data-view="schedule">Back to schedule</button></div>
+          <div id="allBookings" class="booking-table-wrap"></div>
+        </section>
+
+        <footer class="app-footer"><span>BOLT GYM</span><span>MAKE TIME FOR YOURSELF.</span><span id="footerDate"></span></footer>
+      </div>
+
+      <main id="adminView" class="admin-content hidden">
+        <div class="admin-heading"><div><p class="eyebrow">BOLT · THE CONTROL ROOM</p><h1>Gym <em>management.</em></h1><p class="muted">Set operating hours, equipment capacity, and member access.</p></div><button class="button button-outline" type="button" data-view="schedule">← Member view</button></div>
+        <section class="admin-settings panel">
+          <div><p class="eyebrow">BOOKING RULES</p><h2>Daily booking limit</h2><p class="muted">Members may reserve this many half-hour blocks per day.</p></div>
+          <form id="settingsForm" class="limit-form"><label for="dailyLimit">Half-hour blocks per member / day</label><input id="dailyLimit" name="maxBookingsPerDay" type="number" min="1" max="48" required><button class="button button-dark" type="submit">Save limit</button></form>
+        </section>
+
+        <div class="admin-grid">
+          <section class="panel admin-panel">
+            <div class="section-heading"><div><p class="eyebrow">GYM OPERATIONS</p><h2>Hours &amp; equipment</h2></div><span class="duration-pill">30 MIN GRID</span></div>
+            <form id="gymConfigForm" class="admin-form">
+              <div class="form-two"><label>Opens at<input id="gymOpensAt" name="opensAt" type="time" step="1800" required></label><label>Closes at<select id="gymClosesAt" name="closesAt" required></select></label></div>
+              <p class="schedule-note">Capacity means how many people can use this training type at the same time. All hours use the configured gym timezone.</p>
+              <div class="form-three"><label>Yoga spaces<input id="yogaCapacity" name="yoga" type="number" min="0" max="500" required></label><label>Cardio spaces<input id="cardioCapacity" name="cardio" type="number" min="0" max="500" required></label><label>Strength spaces<input id="strengthCapacity" name="strength" type="number" min="0" max="500" required></label></div>
+              <div class="form-actions"><button class="button button-dark" type="submit">Save hours &amp; capacity</button></div>
+            </form>
+
+            <div class="admin-list-heading"><span>ONE-TIME INTERVAL OVERRIDE</span></div>
+            <p class="schedule-note">Change capacity for one training type at one date and time. Set it to the default to clear the override.</p>
+            <form id="capacityForm" class="admin-form">
+              <div class="form-two"><label>Date<input id="capacityDate" name="date" type="date" required></label><label>Training type<select id="capacityCategory" name="category"><option value="yoga">Yoga</option><option value="cardio">Cardio</option><option value="strength">Strength training</option></select></label></div>
+              <div class="form-two"><label>Start time<input id="capacityStart" name="startTime" type="time" step="1800" required></label><label>People allowed<input id="capacityValue" name="capacity" type="number" min="0" max="500" required></label></div>
+              <div class="form-actions"><button class="button button-dark" type="submit">Save interval capacity</button><button id="resetCapacity" class="button button-quiet" type="button">Use default capacity</button></div>
+            </form>
+            <div class="admin-list-heading"><span>INTERVAL OCCUPANCY</span><span id="slotCount" class="count-pill">0</span></div>
+            <div class="form-two admin-availability-filters"><label>Date<input id="adminAvailabilityDate" type="date"></label><label>Training type<select id="adminAvailabilityCategory"><option value="yoga">Yoga</option><option value="cardio">Cardio</option><option value="strength">Strength training</option></select></label></div>
+            <div id="adminSlots" class="admin-list"><div class="loading-state">Loading equipment intervals…</div></div>
+          </section>
+
+          <section class="panel admin-panel">
+            <div class="section-heading"><div><p class="eyebrow">MEMBER CARE</p><h2 id="membershipFormHeading">Add membership</h2></div><span class="member-icon" aria-hidden="true">✳</span></div>
+            <form id="membershipForm" class="admin-form">
+              <label>Member account email<input name="email" type="email" placeholder="member@example.com" required></label>
+              <label>Membership plan<input name="plan" maxlength="80" placeholder="Monthly unlimited" required></label>
+              <div class="form-two"><label>Starts on<input name="startDate" type="date" required></label><label>Expires on<input name="endDate" type="date" required></label></div>
+              <div class="form-actions"><button id="membershipSubmit" class="button button-dark" type="submit">Add membership</button><button id="membershipCancelEdit" class="button button-quiet hidden" type="button">Cancel edit</button></div>
+            </form>
+            <div class="admin-list-heading"><span>MEMBERSHIPS</span><span id="membershipCount" class="count-pill">0</span></div>
+            <div id="adminMemberships" class="admin-list membership-list"><div class="loading-state">Loading memberships…</div></div>
+          </section>
+        </div>
+        <footer class="app-footer"><span>BOLT GYM · ADMIN</span><span>BUILT FOR THE PEOPLE WHO SHOW UP.</span></footer>
+      </main>
+    </div>
+  </body>
+</html>
