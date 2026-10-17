@@ -12,6 +12,7 @@ function readAvailabilityQuery(req) {
   const dayKey = req.query.date || dateKey(new Date());
   const category = typeof req.query.category === "string" ? req.query.category.toLowerCase() : "yoga";
   if (!dateAtGymTime(dayKey, 0, 0)) return { error: "Choose a valid date." };
+  if (dayKey < dateKey(new Date())) return { error: "Choose today or a future date." };
   if (!CATEGORIES.includes(category)) return { error: "Choose yoga, cardio or strength training." };
   return { dayKey, category };
 }
@@ -24,6 +25,7 @@ router.get("/", async (req, res) => {
     const slots = await listSlots({ ...query, userId: req.userId, config });
     return res.json({
       date: query.dayKey,
+      today: dateKey(new Date()),
       category: query.category,
       timeZone: process.env.GYM_TIMEZONE || "Asia/Kolkata",
       gym: { opensAt: config.opensAt, closesAt: config.closesAt, capacities: config.capacities },

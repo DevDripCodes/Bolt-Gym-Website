@@ -25,6 +25,19 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: "100kb" }));
+app.use((error, req, res, next) => {
+  if (error?.type === "entity.parse.failed") {
+    return res.status(400).json({ message: "Send a valid JSON request body." });
+  }
+  if (error?.type === "entity.too.large") {
+    return res.status(413).json({ message: "Request body is too large." });
+  }
+  return next(error);
+});
+app.use("/api", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
 
 app.get("/api/health", (req, res) => res.json({ status: "ok" }));
 app.use("/api/auth", require("./routes/authRoutes"));
@@ -42,8 +55,9 @@ async function startServer() {
   await connectDB();
   // Wait for unique indexes before accepting traffic so duplicate bookings
   // remain impossible even when requests arrive at the same moment.
-  await Promise.all([User.init(), Slot.init(), Booking.init(), BookingLimit.init(), Membership.init(), GymSetting.init(), GymConfig.init()]);
+  await Promise.all([User.init(), Slot.init(), BookingLimit.init(), Membership.init(), GymSetting.init(), GymConfig.init()]);
   await prepareBookingInventory();
+  await Booking.init();
   await getGymConfig();
   await bootstrapAdmin();
 

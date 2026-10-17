@@ -66,7 +66,7 @@ For production, set `NODE_ENV=production` and serve the site over HTTPS. Product
 - Members choose the date, training type, start time, and end time. Times must align to the 30-minute grid and fall within gym hours.
 - Each 30-minute interval has its own capacity and booked count. A booking that spans multiple intervals needs capacity in every interval.
 - The default daily limit is four half-hour blocks per member. Admins can change it from 1 to 48 blocks per day.
-- Members cannot make overlapping bookings. An active membership must cover the full booking window.
+- Members cannot make overlapping bookings, including simultaneous requests for different training types. An active membership must cover the full booking window.
 - Admins can adjust future interval capacity individually. Reducing gym hours is blocked if it would place an existing future booking outside the new hours.
 - There are no payments or payment-provider integrations.
 
@@ -103,4 +103,4 @@ services/     Gym configuration and booking inventory setup
 utils/        Timezone, interval, date, and availability helpers
 ```
 
-See [IMPLEMENTATION.md](IMPLEMENTATION.md) for additional design details and the implementation log.
+All authenticated browser requests use the `gym_session` HTTP-only cookie; no session token is stored in local storage.

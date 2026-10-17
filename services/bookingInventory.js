@@ -9,6 +9,9 @@ async function removeLegacyIndexes() {
     if (index.name !== "_id_" && index.key.slotId === 1) {
       await Booking.collection.dropIndex(index.name);
     }
+    if (index.name !== "_id_" && index.unique && index.key.userId === 1 && index.key.intervalIds === 1) {
+      await Booking.collection.dropIndex(index.name);
+    }
   }
 
   const slotIndexes = await Slot.collection.indexes();
@@ -35,6 +38,7 @@ async function migrateLegacyBookings() {
           startsAt: slot.startsAt,
           endsAt: slot.endsAt,
           intervalIds: [slot._id],
+          blockKeys: [slot.startsAt.toISOString()],
           blockCount: 1,
           dayKey: booking.dayKey || dateKey(slot.startsAt)
         },
@@ -42,6 +46,33 @@ async function migrateLegacyBookings() {
       }
     );
   }
+}
+
+function blockKeysForBooking(booking) {
+  if (!booking.startsAt || !booking.endsAt) return [];
+  const startsAt = new Date(booking.startsAt);
+  const endsAt = new Date(booking.endsAt);
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime()) || startsAt >= endsAt) return [];
+
+  const keys = [];
+  for (let time = startsAt.getTime(); time < endsAt.getTime(); time += 30 * 60 * 1000) {
+    keys.push(new Date(time).toISOString());
+  }
+  return keys;
+}
+
+async function addMissingBlockKeys() {
+  const bookings = await Booking.collection.find({ $or: [{ blockKeys: { $exists: false } }, { blockKeys: { $size: 0 } }] }).toArray();
+  const operations = bookings.map((booking) => {
+    const blockKeys = blockKeysForBooking(booking);
+    return {
+      updateOne: {
+        filter: { _id: booking._id },
+        update: { $set: { blockKeys } }
+      }
+    };
+  });
+  if (operations.length) await Booking.collection.bulkWrite(operations);
 }
 
 async function reconcileCounters() {
@@ -79,6 +110,7 @@ async function reconcileCounters() {
 async function prepareBookingInventory() {
   await removeLegacyIndexes();
   await migrateLegacyBookings();
+  await addMissingBlockKeys();
   await reconcileCounters();
 }
 

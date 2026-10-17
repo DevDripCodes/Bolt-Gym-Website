@@ -1,5 +1,8 @@
 const Slot = require("../models/Slot");
 
+// Default capacity is written only when inventory is first created. Existing
+// rows are changed by the admin configuration route, avoiding stale member
+// requests overwriting a newer admin capacity update.
 async function ensureEquipmentInterval(category, interval, defaultCapacity) {
   try {
     await Slot.updateOne(
@@ -20,10 +23,6 @@ async function ensureEquipmentInterval(category, interval, defaultCapacity) {
     // Another request can create the same category/time inventory row first.
     if (error.code !== 11000) throw error;
   }
-  await Slot.updateOne(
-    { category, startsAt: interval.startsAt, capacityOverride: { $ne: true } },
-    { $set: { capacity: defaultCapacity } }
-  );
   return Slot.findOne({ category, startsAt: interval.startsAt });
 }
 

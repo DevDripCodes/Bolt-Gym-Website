@@ -4,7 +4,12 @@ const User = require("../models/user");
 function readCookie(req, name) {
   const header = req.headers.cookie || "";
   const cookie = header.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
-  return cookie ? decodeURIComponent(cookie.slice(name.length + 1)) : null;
+  if (!cookie) return null;
+  try {
+    return decodeURIComponent(cookie.slice(name.length + 1));
+  } catch (_) {
+    return null;
+  }
 }
 
 async function authMiddleware(req, res, next) {

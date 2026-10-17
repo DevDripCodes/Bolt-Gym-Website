@@ -125,7 +125,7 @@
           <section class="panel admin-panel">
             <div class="section-heading"><div><p class="eyebrow">GYM OPERATIONS</p><h2>Hours &amp; equipment</h2></div><span class="duration-pill">30 MIN GRID</span></div>
             <form id="gymConfigForm" class="admin-form">
-              <div class="form-two"><label>Opens at<input id="gymOpensAt" name="opensAt" type="time" step="1800" required></label><label>Closes at<select id="gymClosesAt" name="closesAt" required></select></label></div>
+              <div class="form-two"><label>Opens at<select id="gymOpensAt" name="opensAt" required></select></label><label>Closes at<select id="gymClosesAt" name="closesAt" required></select></label></div>
               <p class="schedule-note">Capacity means how many people can use this training type at the same time. All hours use the configured gym timezone.</p>
               <div class="form-three"><label>Yoga spaces<input id="yogaCapacity" name="yoga" type="number" min="0" max="500" required></label><label>Cardio spaces<input id="cardioCapacity" name="cardio" type="number" min="0" max="500" required></label><label>Strength spaces<input id="strengthCapacity" name="strength" type="number" min="0" max="500" required></label></div>
               <div class="form-actions"><button class="button button-dark" type="submit">Save hours &amp; capacity</button></div>
@@ -135,7 +135,7 @@
             <p class="schedule-note">Change capacity for one training type at one date and time. Set it to the default to clear the override.</p>
             <form id="capacityForm" class="admin-form">
               <div class="form-two"><label>Date<input id="capacityDate" name="date" type="date" required></label><label>Training type<select id="capacityCategory" name="category"><option value="yoga">Yoga</option><option value="cardio">Cardio</option><option value="strength">Strength training</option></select></label></div>
-              <div class="form-two"><label>Start time<input id="capacityStart" name="startTime" type="time" step="1800" required></label><label>People allowed<input id="capacityValue" name="capacity" type="number" min="0" max="500" required></label></div>
+              <div class="form-two"><label>Start time<select id="capacityStart" name="startTime" required></select></label><label>People allowed<input id="capacityValue" name="capacity" type="number" min="0" max="500" required></label></div>
               <div class="form-actions"><button class="button button-dark" type="submit">Save interval capacity</button><button id="resetCapacity" class="button button-quiet" type="button">Use default capacity</button></div>
             </form>
             <div class="admin-list-heading"><span>INTERVAL OCCUPANCY</span><span id="slotCount" class="count-pill">0</span></div>

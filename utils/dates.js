@@ -36,7 +36,14 @@ function dateAtGymTime(value, hour, minute, second = 0) {
     );
     candidate += targetUtc - representedUtc;
   }
-  return new Date(candidate);
+  const values = Object.fromEntries(formatter.formatToParts(new Date(candidate)).map((part) => [part.type, part.value]));
+  const matchesRequestedTime = Number(values.year) === year
+    && Number(values.month) === month
+    && Number(values.day) === day
+    && Number(values.hour) === hour
+    && Number(values.minute) === minute
+    && Number(values.second) === second;
+  return matchesRequestedTime ? new Date(candidate) : null;
 }
 
 function startOfDate(value) {

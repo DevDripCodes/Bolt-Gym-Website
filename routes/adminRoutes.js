@@ -16,6 +16,14 @@ const { CATEGORIES, clockMinutes } = require("../utils/timeSlots");
 const router = express.Router();
 router.use(authMiddleware, adminMiddleware);
 
+function requestBody(req) {
+  return req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {};
+}
+
+function isIntegerInRange(value, min, max) {
+  return Number.isInteger(value) && value >= min && value <= max;
+}
+
 function minutesAtGym(date) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: process.env.GYM_TIMEZONE || "Asia/Kolkata",
@@ -35,7 +43,7 @@ router.get("/slots", async (req, res) => {
     if (!CATEGORIES.includes(category)) return res.status(400).json({ message: "Choose yoga, cardio or strength training." });
     const config = await getGymConfig();
     const slots = await listSlots({ userId: null, dayKey, category, config });
-    return res.json({ slots, date: dayKey, category, gym: config });
+    return res.json({ slots, date: dayKey, today: dateKey(new Date()), category, gym: config });
   } catch (error) {
     console.error("Load admin availability error:", error.message);
     return res.status(500).json({ message: "We could not load equipment availability." });
@@ -53,7 +61,7 @@ router.get("/config", async (req, res) => {
 });
 
 router.patch("/config", async (req, res) => {
-  const { opensAt, closesAt, capacities } = req.body;
+  const { opensAt, closesAt, capacities } = requestBody(req);
   const open = clockMinutes(opensAt);
   const close = clockMinutes(closesAt, true);
   if (open === null || close === null || open >= close) {
@@ -61,8 +69,8 @@ router.patch("/config", async (req, res) => {
   }
   const nextCapacities = {};
   for (const category of CATEGORIES) {
-    const value = Number(capacities?.[category]);
-    if (!Number.isInteger(value) || value < 0 || value > 500) {
+    const value = capacities?.[category];
+    if (!isIntegerInRange(value, 0, 500)) {
       return res.status(400).json({ message: "Equipment capacity must be a whole number from 0 to 500 for each training type." });
     }
     nextCapacities[category] = value;
@@ -102,12 +110,17 @@ router.patch("/config", async (req, res) => {
 });
 
 router.patch("/slot-capacity", async (req, res) => {
-  const { date, category, startTime, useDefault } = req.body;
+  const body = requestBody(req);
+  const date = body.date;
+  const category = typeof body.category === "string" ? body.category.toLowerCase() : "";
+  const startTime = body.startTime;
+  const useDefault = body.useDefault;
+  if (typeof useDefault !== "boolean") return res.status(400).json({ message: "Specify whether this interval should use the default capacity." });
   if (!CATEGORIES.includes(category)) return res.status(400).json({ message: "Choose yoga, cardio or strength training." });
   const minute = clockMinutes(startTime);
   if (minute === null) return res.status(400).json({ message: "Choose a start time on a 30-minute boundary." });
-  const customCapacity = Number(req.body.capacity);
-  if (!useDefault && (!Number.isInteger(customCapacity) || customCapacity < 0 || customCapacity > 500)) {
+  const customCapacity = body.capacity;
+  if (!useDefault && !isIntegerInRange(customCapacity, 0, 500)) {
     return res.status(400).json({ message: "Capacity must be a whole number from 0 to 500." });
   }
   try {
@@ -137,13 +150,18 @@ router.patch("/slot-capacity", async (req, res) => {
 });
 
 router.get("/settings", async (req, res) => {
-  const setting = await GymSetting.findOne({ key: "maxBookingsPerDay" }).lean();
-  return res.json({ maxBookingsPerDay: setting?.value || 4 });
+  try {
+    const setting = await GymSetting.findOne({ key: "maxBookingsPerDay" }).lean();
+    return res.json({ maxBookingsPerDay: setting?.value || 4 });
+  } catch (error) {
+    console.error("Load settings error:", error.message);
+    return res.status(500).json({ message: "We could not load the booking limit." });
+  }
 });
 
 router.patch("/settings", async (req, res) => {
-  const value = Number(req.body.maxBookingsPerDay);
-  if (!Number.isInteger(value) || value < 1 || value > 48) {
+  const value = requestBody(req).maxBookingsPerDay;
+  if (!isIntegerInRange(value, 1, 48)) {
     return res.status(400).json({ message: "The daily booking limit must be a whole number from 1 to 48 half-hour blocks." });
   }
   try {
@@ -180,6 +198,9 @@ router.get("/memberships", async (req, res) => {
 });
 
 function readMembershipDates(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return { error: "Enter a membership plan and valid membership dates." };
+  }
   const startsAt = startOfDate(body.startDate);
   const expiresAt = endOfDate(body.endDate);
   if (!startsAt || !expiresAt || startsAt > expiresAt) return { error: "Choose a valid membership start and end date." };
@@ -189,10 +210,11 @@ function readMembershipDates(body) {
 }
 
 router.post("/memberships", async (req, res) => {
-  const parsed = readMembershipDates(req.body);
+  const body = requestBody(req);
+  const parsed = readMembershipDates(body);
   if (parsed.error) return res.status(400).json({ message: parsed.error });
-  const email = typeof req.body.email === "string" ? req.body.email.trim().toLowerCase() : "";
-  if (!email) return res.status(400).json({ message: "Enter the member's account email." });
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ message: "Enter a valid member account email." });
   try {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "No account was found for that email." });
@@ -207,13 +229,16 @@ router.post("/memberships", async (req, res) => {
 
 router.patch("/memberships/:id", async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Choose a valid membership." });
-  const parsed = readMembershipDates(req.body);
+  const body = requestBody(req);
+  const parsed = readMembershipDates(body);
   if (parsed.error) return res.status(400).json({ message: parsed.error });
   try {
     const membership = await Membership.findById(req.params.id);
     if (!membership) return res.status(404).json({ message: "Membership not found." });
-    if (typeof req.body.email === "string" && req.body.email.trim()) {
-      const user = await User.findOne({ email: req.body.email.trim().toLowerCase() });
+    if (typeof body.email === "string" && body.email.trim()) {
+      const email = body.email.trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ message: "Enter a valid member account email." });
+      const user = await User.findOne({ email });
       if (!user) return res.status(404).json({ message: "No account was found for that email." });
       membership.userId = user._id;
     }

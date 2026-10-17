@@ -52,9 +52,10 @@ async function releaseInventorySlots(slotIds) {
 }
 
 router.post("/", async (req, res) => {
-  const { date, category } = req.body;
-  const startTime = req.body.startTime;
-  const endTime = req.body.endTime;
+  const body = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {};
+  const { date } = body;
+  const category = typeof body.category === "string" ? body.category.toLowerCase() : "";
+  const { startTime, endTime } = body;
   if (!CATEGORIES.includes(category)) return res.status(400).json({ message: "Choose yoga, cardio or strength training." });
 
   let range;
@@ -122,6 +123,7 @@ router.post("/", async (req, res) => {
       startsAt: range.startsAt,
       endsAt: range.endsAt,
       intervalIds: reservedSlots,
+      blockKeys: range.intervals.map((interval) => interval.startsAt.toISOString()),
       blockCount: range.intervals.length,
       dayKey: day
     });
@@ -134,6 +136,9 @@ router.post("/", async (req, res) => {
     if (reservedBlocks && day) cleanup.push(releaseDailyBlocks(req.userId, day, reservedBlocks));
     const results = await Promise.allSettled(cleanup);
     if (results.some((result) => result.status === "rejected")) console.error("Booking rollback failed.");
+    if (error.code === 11000) {
+      return res.status(409).json({ message: "You already have a booking that overlaps this time." });
+    }
     console.error("Create booking error:", error.message);
     return res.status(500).json({ message: "We could not complete this booking. Please try again." });
   }
@@ -148,9 +153,11 @@ router.delete("/:id", async (req, res) => {
 
     const removed = await Booking.findOneAndDelete({ _id: booking._id, userId: req.userId });
     if (!removed) return res.status(404).json({ message: "Booking not found." });
+    const intervalIds = Array.isArray(removed.intervalIds) ? removed.intervalIds : [];
+    const blockCount = Number.isInteger(removed.blockCount) ? removed.blockCount : intervalIds.length;
     await Promise.all([
-      releaseInventorySlots(removed.intervalIds || []),
-      releaseDailyBlocks(removed.userId, removed.dayKey, removed.blockCount || removed.intervalIds.length)
+      releaseInventorySlots(intervalIds),
+      releaseDailyBlocks(removed.userId, removed.dayKey, blockCount)
     ]);
     return res.json({ message: "Booking cancelled." });
   } catch (error) {

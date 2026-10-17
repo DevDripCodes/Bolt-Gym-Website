@@ -66,9 +66,12 @@ function parseBookingRange(dayKey, startTime, endTime, config) {
   if (dateKey(new Date(endsAt.getTime() - 1)) !== dayKey) return null;
   const intervals = [];
   for (let minute = start; minute < end; minute += 30) {
+    const intervalStartsAt = dateAtMinutes(dayKey, minute);
+    const intervalEndsAt = dateAtMinutes(dayKey, minute + 30);
+    if (!intervalStartsAt || !intervalEndsAt) return null;
     intervals.push({
-      startsAt: dateAtMinutes(dayKey, minute),
-      endsAt: dateAtMinutes(dayKey, minute + 30),
+      startsAt: intervalStartsAt,
+      endsAt: intervalEndsAt,
       startTime: clockString(minute),
       endTime: clockString(minute + 30)
     });

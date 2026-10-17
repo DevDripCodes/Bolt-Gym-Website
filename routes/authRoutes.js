@@ -10,6 +10,10 @@ const router = express.Router();
 const COOKIE_NAME = "gym_session";
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
+function requestBody(req) {
+  return req.body && typeof req.body === "object" && !Array.isArray(req.body) ? req.body : {};
+}
+
 function writeSessionCookie(req, res, user) {
   const token = jwt.sign({}, process.env.JWT_SECRET, {
     subject: user._id.toString(),
@@ -54,7 +58,7 @@ async function membershipSummary(userId) {
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password } = requestBody(req);
     if (typeof name !== "string" || typeof email !== "string" || typeof password !== "string") {
       return res.status(400).json({ message: "Name, email and password are required." });
     }
@@ -84,7 +88,7 @@ router.post("/register", async (req, res) => {
 
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = requestBody(req);
     if (typeof email !== "string" || typeof password !== "string" || !email.trim() || !password) {
       return res.status(400).json({ message: "Email and password are required." });
     }

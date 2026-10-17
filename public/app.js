@@ -6,6 +6,7 @@ const state = {
   memberships: [],
   gym: null,
   timeZone: null,
+  gymToday: null,
   selectedDate: null,
   category: "yoga",
   adminSlots: [],
@@ -14,7 +15,10 @@ const state = {
   adminCategory: "yoga",
   view: "schedule",
   editingMembershipId: null,
-  toastTimer: null
+  toastTimer: null,
+  dashboardRequestId: 0,
+  availabilityRequestId: 0,
+  adminRequestId: 0
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -61,6 +65,18 @@ function localDayKey(value) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function dateInputValue(value) {
+  if (!state.timeZone) return localDayKey(value);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: state.timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date(value));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function setSignedIn(user, membership) {
   state.user = user;
   state.membership = membership;
@@ -90,24 +106,29 @@ function setAuthMode(mode) {
 }
 
 async function loadDashboard() {
+  const requestId = ++state.dashboardRequestId;
   try {
     const adminWorkspace = state.user?.role === "admin" && state.view === "admin";
-  const params = new URLSearchParams();
-  if (state.selectedDate) params.set("date", state.selectedDate);
-  params.set("category", state.category);
-  const [slotData, bookingData, profileData] = await Promise.all([
+    const params = new URLSearchParams();
+    if (state.selectedDate) params.set("date", state.selectedDate);
+    params.set("category", state.category);
+    const [slotData, bookingData, profileData] = await Promise.all([
       api(`/api/slots?${params}`),
       api("/api/bookings/me"),
       api("/api/auth/me")
     ]);
+    if (requestId !== state.dashboardRequestId) return;
     state.selectedDate = slotData.date;
+    state.gymToday = slotData.today;
     state.gym = slotData.gym;
     state.timeZone = slotData.timeZone;
     state.slots = slotData.slots || [];
     state.bookings = bookingData.bookings || [];
     state.membership = profileData.membership || null;
     $("#bookingDate").value = state.selectedDate;
+    $("#bookingDate").min = state.gymToday || state.selectedDate;
     $("#bookingCategory").value = state.category;
+    if (!state.editingMembershipId) setDefaultMembershipDates();
     populateBookingTimes();
     renderMemberView();
     if (adminWorkspace) loadAdminData();
@@ -185,6 +206,8 @@ function populateBookingTimes() {
   const ends = [...starts, ...(state.slots.length ? [state.slots[state.slots.length - 1].endTime] : [])];
   startTarget.innerHTML = starts.map((time) => `<option value="${escapeHtml(time)}">${escapeHtml(displayClock(time))}</option>`).join("");
   endTarget.innerHTML = ends.map((time) => `<option value="${escapeHtml(time)}">${escapeHtml(displayClock(time))}</option>`).join("");
+  startTarget.disabled = starts.length === 0;
+  endTarget.disabled = starts.length === 0;
   startTarget.value = starts.includes(oldStart) ? oldStart : starts[0] || "";
   const firstEnd = ends.find((time) => time > startTarget.value) || "";
   endTarget.value = ends.includes(oldEnd) && oldEnd > startTarget.value ? oldEnd : firstEnd;
@@ -275,42 +298,75 @@ function setView(view) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function dateInputValue(value) {
-  return new Date(value).toISOString().slice(0, 10);
-}
-
 function formatMembershipDate(value) {
   return new Intl.DateTimeFormat(undefined, { month: "long", day: "numeric", year: "numeric" }).format(new Date(`${value}T00:00:00`));
 }
 
 function localDateInputValue(value) {
-  const date = new Date(value);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  return dateInputValue(value);
+}
+
+function addCalendarMonths(dayKey, months) {
+  const [year, month, day] = dayKey.split("-").map(Number);
+  const target = new Date(Date.UTC(year, month - 1 + months, 1));
+  const targetYear = target.getUTCFullYear();
+  const targetMonth = target.getUTCMonth();
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(Math.min(day, lastDay)).padStart(2, "0")}`;
 }
 
 function setDefaultMembershipDates() {
   const form = $("#membershipForm");
-  const start = new Date();
-  const end = new Date();
-  end.setMonth(end.getMonth() + 1);
-  form.elements.startDate.value = localDateInputValue(start);
-  form.elements.endDate.value = localDateInputValue(end);
+  const start = state.gymToday || localDateInputValue(new Date());
+  form.elements.startDate.value = start;
+  form.elements.endDate.value = addCalendarMonths(start, 1);
 }
 
-function populateGymCloseTimes() {
-  const target = $("#gymClosesAt");
-  const previous = target.value;
+function timeOption(value) {
+  return `<option value="${value}">${escapeHtml(displayClock(value))}${value === "24:00" ? " · midnight" : ""}</option>`;
+}
+
+function populateGymOpenTimes(preferred) {
+  const target = $("#gymOpensAt");
+  const previous = preferred || target.value;
   const options = [];
-  for (let minute = 30; minute <= 1440; minute += 30) {
-    const value = minute === 1440 ? "24:00" : `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
-    options.push(`<option value="${value}">${escapeHtml(displayClock(value))}${value === "24:00" ? " · midnight" : ""}</option>`);
+  for (let minute = 0; minute < 1440; minute += 30) {
+    const value = `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+    options.push(timeOption(value));
   }
   target.innerHTML = options.join("");
-  target.value = previous;
+  target.value = previous || "06:00";
+}
+
+function populateGymCloseTimes(preferred) {
+  const target = $("#gymClosesAt");
+  const previous = preferred || target.value;
+  const opening = clockValue($("#gymOpensAt").value);
+  const options = [];
+  for (let minute = opening + 30; minute <= 1440; minute += 30) {
+    const value = minute === 1440 ? "24:00" : `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+    options.push(timeOption(value));
+  }
+  target.innerHTML = options.join("");
+  target.value = [...target.options].some((option) => option.value === previous) ? previous : target.options[0]?.value || "";
+}
+
+function populateCapacityStartTimes() {
+  const target = $("#capacityStart");
+  const previous = target.value;
+  const starts = state.adminSlots.filter((slot) => !slot.isPast).map((slot) => slot.startTime);
+  target.innerHTML = starts.length
+    ? starts.map((time) => `<option value="${escapeHtml(time)}">${escapeHtml(displayClock(time))}</option>`).join("")
+    : '<option value="">No future intervals</option>';
+  target.disabled = starts.length === 0;
+  target.value = starts.includes(previous) ? previous : starts[0] || "";
+  $("#capacityForm button[type=submit]").disabled = starts.length === 0;
+  $("#resetCapacity").disabled = starts.length === 0;
 }
 
 async function loadAdminData() {
   if (state.user?.role !== "admin") return;
+  const requestId = ++state.adminRequestId;
   try {
     const dateInput = $("#adminAvailabilityDate");
     const categoryInput = $("#adminAvailabilityCategory");
@@ -324,18 +380,21 @@ async function loadAdminData() {
       api("/api/admin/settings"),
       api("/api/admin/config")
     ]);
+    if (requestId !== state.adminRequestId) return;
     state.adminSlots = slotData.slots || [];
+    state.gymToday = slotData.today || state.gymToday;
     state.adminConfig = configData.config;
     state.memberships = membershipData.memberships || [];
     $("#dailyLimit").value = settings.maxBookingsPerDay || 4;
-    populateGymCloseTimes();
-    $("#gymOpensAt").value = state.adminConfig.opensAt;
-    $("#gymClosesAt").value = state.adminConfig.closesAt;
+    populateGymOpenTimes(state.adminConfig.opensAt);
+    populateGymCloseTimes(state.adminConfig.closesAt);
     $("#yogaCapacity").value = state.adminConfig.capacities.yoga;
     $("#cardioCapacity").value = state.adminConfig.capacities.cardio;
     $("#strengthCapacity").value = state.adminConfig.capacities.strength;
     $("#capacityDate").value = state.adminDate;
+    $("#capacityDate").min = state.gymToday || state.adminDate;
     $("#capacityCategory").value = state.adminCategory;
+    populateCapacityStartTimes();
     renderAdminLists();
   } catch (error) {
     if (error.status === 401) return signOut(false);
@@ -527,20 +586,28 @@ $("#bookingForm").addEventListener("submit", async (event) => {
 });
 
 async function loadAvailability() {
+  const requestId = ++state.availabilityRequestId;
   const target = $("#scheduleList");
   target.innerHTML = '<div class="loading-state">Checking equipment availability…</div>';
   try {
     const params = new URLSearchParams({ date: state.selectedDate, category: state.category });
     const result = await api(`/api/slots?${params}`);
+    if (requestId !== state.availabilityRequestId) return;
     state.selectedDate = result.date;
+    state.gymToday = result.today;
     state.gym = result.gym;
     state.timeZone = result.timeZone;
     state.slots = result.slots || [];
     $("#bookingDate").value = state.selectedDate;
+    $("#bookingDate").min = state.gymToday || state.selectedDate;
     populateBookingTimes();
     renderSchedule();
   } catch (error) {
+    if (requestId !== state.availabilityRequestId) return;
     if (error.status === 401) return signOut(false);
+    $("#bookingStart").disabled = true;
+    $("#bookingEnd").disabled = true;
+    $("#bookWindowButton").disabled = true;
     target.innerHTML = '<div class="empty-schedule"><strong>Availability could not be loaded.</strong>Please try again.</div>';
     notify(error.message, true);
   }
@@ -564,6 +631,8 @@ $("#gymConfigForm").addEventListener("submit", async (event) => {
     await loadAdminData();
   } catch (error) { notify(error.message, true); }
 });
+
+$("#gymOpensAt").addEventListener("change", () => populateGymCloseTimes());
 
 $("#capacityForm").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -590,6 +659,16 @@ $("#adminAvailabilityDate").addEventListener("change", () => {
 $("#adminAvailabilityCategory").addEventListener("change", () => {
   state.adminCategory = $("#adminAvailabilityCategory").value;
   $("#capacityCategory").value = state.adminCategory;
+  loadAdminData();
+});
+$("#capacityDate").addEventListener("change", () => {
+  state.adminDate = $("#capacityDate").value;
+  $("#adminAvailabilityDate").value = state.adminDate;
+  loadAdminData();
+});
+$("#capacityCategory").addEventListener("change", () => {
+  state.adminCategory = $("#capacityCategory").value;
+  $("#adminAvailabilityCategory").value = state.adminCategory;
   loadAdminData();
 });
 $("#resetCapacity").addEventListener("click", async () => {
